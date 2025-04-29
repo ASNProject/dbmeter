@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Decibel Meter</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 30px;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        h2 {
+            font-size: 48px;
+            color: #007bff;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            margin-top: 20px;
+            cursor: pointer;
+            background-color: #28a745;
+            border: none;
+            color: white;
+            border-radius: 5px;
+        }
+
+        button.stop {
+            background-color: #dc3545;
+        }
+
+        #chart-container {
+            width: 80%;
+            margin: auto;
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Realtime Decibel Meter</h1>
+    <h2 id="dbValue">0 dB</h2>
+    <button id="toggleButton" onclick="toggleMeter()">Start Meter</button>
+
+    <div id="chart-container">
+        <canvas id="decibelChart"></canvas>
+    </div>
+
+    <script>
+        let interval = null;
+        let isRunning = false;
+
+        const dbDisplay = document.getElementById('dbValue');
+        const btn = document.getElementById('toggleButton');
+
+        // Setup chart
+        const ctx = document.getElementById('decibelChart').getContext('2d');
+        const chartData = {
+            labels: [],
+            datasets: [{
+                label: 'Decibel (dB)',
+                data: [],
+                borderColor: 'blue',
+                fill: false,
+                tension: 0.3
+            }]
+        };
+
+        const dbChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                animation: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Time'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'dB'
+                        }
+                    }
+                }
+            }
+        });
+
+        function toggleMeter() {
+            if (!isRunning) {
+                // RESET chart data
+                chartData.labels = [];
+                chartData.datasets[0].data = [];
+                dbChart.update();
+                // START
+                fetch('/start').then(() => {
+                    interval = setInterval(() => {
+                        fetch('/decibel')
+                            .then(response => response.json())
+                            .then(data => {
+                                const now = new Date().toLocaleTimeString();
+                                dbDisplay.innerText = data.decibel + " dB";
+
+                                // Update chart
+                                chartData.labels.push(now);
+                                chartData.datasets[0].data.push(data.decibel);
+
+                                // Keep max 20 points
+                                if (chartData.labels.length > 20) {
+                                    chartData.labels.shift();
+                                    chartData.datasets[0].data.shift();
+                                }
+
+                                dbChart.update();
+                            });
+                    }, 1000);
+                    btn.innerText = "Stop Meter";
+                    btn.classList.add("stop");
+                    isRunning = true;
+                });
+            } else {
+                // STOP
+                clearInterval(interval);
+                interval = null;
+                btn.innerText = "Start Meter";
+                btn.classList.remove("stop");
+                isRunning = false;
+            }
+        }
+    </script>
+</body>
+</html>
